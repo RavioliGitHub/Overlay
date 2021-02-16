@@ -5,6 +5,7 @@ from win32api import GetSystemMetrics
 import pyautogui  # Do not remove: This makes other screen tools work correctly
 
 from src.UI_Elements.ReadBoxManager import ReadBoxManager
+from src.Control.FocusManager import FocusManager
 
 def log(text, *args):
     print(text)
@@ -18,12 +19,13 @@ class Overlay(tk.Canvas):
         self.widgets = []
         self.make_on_top_and_transparent()
         self.read_box_manager = ReadBoxManager()
+        self.focus_manager = FocusManager()
         self.bind("<ButtonPress-1>", self.on_press)
         self.bind("<B1-Motion>", self.on_drag)
         self.bind("<ButtonRelease-1>", self.on_release)
         self.bind("<Button-3>", self.switch_density)
         self.scroll_states = ["Transp", "Add", "Move", "Resize", "Delete"]
-        self.scroll_state = 0
+        self.scroll_state = 1
         self.sub_state = None
         self.state_lock = False
         self.focus_box = None
@@ -37,7 +39,7 @@ class Overlay(tk.Canvas):
         self.master.geometry("+0+0")
         self.master.lift()
         self.master.wm_attributes("-topmost", True)
-        # self.master.wm_attributes("-disabled", False)
+        #self.master.wm_attributes("-disabled", False)
         self.master.wm_attributes("-transparentcolor", "white")
 
     def add_buttons(self):
@@ -45,13 +47,18 @@ class Overlay(tk.Canvas):
         button1.configure(width=10, activebackground="#33B5E5", relief='flat')
         button1_window = self.create_window(10, 10, anchor='nw', window=button1)
 
-        button2 = tk.Button(self, text="Quit", command=self.quit, anchor='w')
+        button2 = tk.Button(self.master, text="Quit", command=self.quit, anchor='w')
         button2.configure(width=10, activebackground="#33B5E5", relief='flat')
+        #button2.place()
         button2_window = self.create_window(110, 10, anchor='nw', window=button2)
 
-        button3 = tk.Button(self, text="draw", command=self.draw, anchor='w')
+        button3 = tk.Button(self, text="Save", command=self.read_box_manager.save_to_config, anchor='w')
         button3.configure(width=10, activebackground="#33B5E5", relief='flat')
         button3_window = self.create_window(210, 10, anchor='nw', window=button3)
+
+        button4 = tk.Button(self, text="New box", command=self.read_box_manager.create_new_read_box, anchor='w')
+        button4.configure(width=10, activebackground="#33B5E5", relief='flat')
+        button4_window = self.create_window(310, 10, anchor='nw', window=button4)
 
     def switch_density(self, *args):
         if not self.dense:
@@ -68,23 +75,34 @@ class Overlay(tk.Canvas):
         self.add_buttons()
         self.draw_scroll_state()
         self.read_box_manager.draw_all(self)
-        self.create_rectangle(500, 500, 600, 600, fill="black", outline="red", width=20)
         self.after(100, self.draw)
 
     def on_press(self, event):
-        log("on press")
-        if self.scroll_states[self.scroll_state] == "Add" and not self.sub_state:
-            self.add(event)
+        if self.focus_manager.get_focused():
+            self.focus_manager.lock_focus()
+            self.focus_manager.get_focused().on_press(event)
+        else:
+            log("on press")
+            if self.scroll_states[self.scroll_state] == "Add" and not self.sub_state:
+                self.add(event)
 
     def on_drag(self, event):
-        log("on drag")
-        if self.scroll_states[self.scroll_state] == "Add" and self.sub_state == "adding":
-            self.resize(event)
+        if self.focus_manager.get_focused():
+            self.focus_manager.get_focused().on_drag(event)
+        else:
+            log("on drag")
+            if self.scroll_states[self.scroll_state] == "Add" and self.sub_state == "adding":
+                self.resize(event)
 
     def on_release(self, event):
-        log("on release")
-        if self.scroll_states[self.scroll_state] == "Add" and self.sub_state == "adding":
-            self.finalize_adding(event)
+        if self.focus_manager.get_focused():
+            self.focus_manager.get_focused().on_release(event)
+            self.focus_manager.unlock_focus()
+            self.focus_manager.release_focus()
+        else:
+            log("on release")
+            if self.scroll_states[self.scroll_state] == "Add" and self.sub_state == "adding":
+                self.finalize_adding(event)
 
     def add(self, event):
         box = self.read_box_manager.create_new_read_box()
@@ -98,13 +116,11 @@ class Overlay(tk.Canvas):
         log("Adding")
 
     def resize(self, event):
-        self.focus_box.x1 = event.x
-        self.focus_box.y1 = event.y
+        self.focus_box.x2 = event.x
+        self.focus_box.y2 = event.y
         log("Resizing")
 
     def finalize_adding(self, event):
-        self.focus_box.x1 = event.x
-        self.focus_box.y1 = event.y
         self.sub_state = None
         self.focus_box = None
         self.state_lock = False

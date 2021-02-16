@@ -2,6 +2,7 @@ from typing import List, Any
 
 from src.UI_Elements.ReadBoxFile import ReadBox
 from src.UI_Elements.configFile import read_box_dic_list
+from src.Control.FocusManager import FocusManager
 
 
 class ReadBoxManager:
@@ -12,6 +13,7 @@ class ReadBoxManager:
         self.configFile = "configFile.py"
         self.config_list_name = "read_box_dic_list"
         self.free_ids = list(range(1, 100))
+        self.setup()
 
     def setup(self):
         for box_dic in read_box_dic_list:
